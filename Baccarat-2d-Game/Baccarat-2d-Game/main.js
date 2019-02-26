@@ -24,6 +24,8 @@ var B2DGAME;
         Engine.prototype.start = function () {
             this._canvas = B2DGAME.GLUtilities.initialize();
             B2DGAME.gl.clearColor(0, 0, 0, 1);
+            this.loadShaders();
+            this._shader.use();
             this.loop();
         };
         /**
@@ -40,6 +42,11 @@ var B2DGAME;
             B2DGAME.gl.clear(B2DGAME.gl.COLOR_BUFFER_BIT);
             //want to call loop against this particular instance of the engine
             requestAnimationFrame(this.loop.bind(this));
+        };
+        Engine.prototype.loadShaders = function () {
+            var vertexShaderSource = "\nattribute vec3 a_position;\nvoid main()\n{\n    gl_Position = vec4(a_position, 1.0);\n}";
+            var fragmentShaderSource = "\nprecision mediump float;\nvoid main(){\n    gl_FragColor = vec4(1.0);\n}";
+            this._shader = new B2DGAME.Shader("basic", vertexShaderSource, fragmentShaderSource);
         };
         return Engine;
     }());
@@ -78,5 +85,63 @@ var B2DGAME;
         return GLUtilities;
     }());
     B2DGAME.GLUtilities = GLUtilities;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    /**
+     * Represents a WebGL shader.
+     */
+    var Shader = /** @class */ (function () {
+        /**
+         * Creates a new shader
+         * @param name
+         * @param vertexSource the source of the vertex shader
+         * @param fragmentSource the source of the fragment shader
+         */
+        function Shader(name, vertexSource, fragmentSource) {
+            this._name = name;
+            var vertextShader = this.loadShader(vertexSource, B2DGAME.gl.VERTEX_SHADER);
+            var fragmentShader = this.loadShader(fragmentSource, B2DGAME.gl.FRAGMENT_SHADER);
+            this.createProgram(vertextShader, fragmentShader);
+        }
+        Object.defineProperty(Shader.prototype, "name", {
+            /**
+            * The name of the shader
+            */
+            get: function () {
+                return this._name;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        /**
+        * Use this shader
+        */
+        Shader.prototype.use = function () {
+            B2DGAME.gl.useProgram(this._program);
+        };
+        Shader.prototype.loadShader = function (source, shaderType) {
+            var shader = B2DGAME.gl.createShader(shaderType);
+            B2DGAME.gl.shaderSource(shader, source);
+            B2DGAME.gl.compileShader(shader);
+            var error = B2DGAME.gl.getShaderInfoLog(shader);
+            if (error !== "") {
+                throw new Error("Error compiling shader: '" + this._name + "': " + error);
+            }
+            return shader;
+        };
+        Shader.prototype.createProgram = function (vertexShader, fragmentShader) {
+            this._program = B2DGAME.gl.createProgram();
+            B2DGAME.gl.attachShader(this._program, vertexShader);
+            B2DGAME.gl.attachShader(this._program, fragmentShader);
+            B2DGAME.gl.linkProgram(this._program);
+            var error = B2DGAME.gl.getProgramInfoLog(this._program);
+            if (error !== "") {
+                throw new Error("Error compiling linking shader: '" + this._name + "': " + error);
+            }
+        };
+        return Shader;
+    }());
+    B2DGAME.Shader = Shader;
 })(B2DGAME || (B2DGAME = {}));
 //# sourceMappingURL=main.js.map
