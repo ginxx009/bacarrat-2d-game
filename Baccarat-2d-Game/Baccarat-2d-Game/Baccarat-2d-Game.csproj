@@ -133,6 +133,7 @@
     <TypeScriptCompile Include="app.ts" />
     <TypeScriptCompile Include="core\engine.ts" />
     <TypeScriptCompile Include="core\gl\gl.ts" />
+    <TypeScriptCompile Include="core\gl\glbuffer.ts" />
     <TypeScriptCompile Include="core\gl\shader.ts" />
   </ItemGroup>
   <ItemGroup>

@@ -40,35 +40,34 @@ var B2DGAME;
             }
         };
         Engine.prototype.loop = function () {
-            //clear the color buffer of the screen before you present an image to the screen
             B2DGAME.gl.clear(B2DGAME.gl.COLOR_BUFFER_BIT);
-            //draw the buffer
-            B2DGAME.gl.bindBuffer(B2DGAME.gl.ARRAY_BUFFER, this._buffer);
-            B2DGAME.gl.vertexAttribPointer(0, 3, B2DGAME.gl.FLOAT, false, 0, 0);
-            B2DGAME.gl.enableVertexAttribArray(0);
-            this.resize();
-            B2DGAME.gl.drawArrays(B2DGAME.gl.TRIANGLES, 0, 3);
-            //want to call loop against this particular instance of the engine
+            //Set uniform
+            var colorPosition = this._shader.getUniformLocation("u_color");
+            B2DGAME.gl.uniform4f(colorPosition, 1, 0.5, 0, 1);
+            this._buffer.bind();
+            this._buffer.draw();
             requestAnimationFrame(this.loop.bind(this));
         };
         Engine.prototype.createBuffer = function () {
-            this._buffer = B2DGAME.gl.createBuffer();
+            this._buffer = new B2DGAME.GLBuffer(3);
+            var positionAttribute = new B2DGAME.AttributeInfo();
+            positionAttribute.location = this._shader.getAttributeLocation("a_position");
+            positionAttribute.offset = 0;
+            positionAttribute.size = 3;
+            this._buffer.addAttributeLocation(positionAttribute);
             var vertices = [
                 //x y z
                 0, 0, 0,
                 0, 0.5, 0,
                 0.5, 0.5, 0
             ];
-            B2DGAME.gl.bindBuffer(B2DGAME.gl.ARRAY_BUFFER, this._buffer);
-            B2DGAME.gl.vertexAttribPointer(0, 3, B2DGAME.gl.FLOAT, false, 0, 0);
-            B2DGAME.gl.enableVertexAttribArray(0);
-            B2DGAME.gl.bufferData(B2DGAME.gl.ARRAY_BUFFER, new Float32Array(vertices), B2DGAME.gl.STATIC_DRAW);
-            B2DGAME.gl.bindBuffer(B2DGAME.gl.ARRAY_BUFFER, undefined);
-            B2DGAME.gl.disableVertexAttribArray(0);
+            this._buffer.pushBackData(vertices);
+            this._buffer.upload();
+            this._buffer.unbind();
         };
         Engine.prototype.loadShaders = function () {
             var vertexShaderSource = "\nattribute vec3 a_position;\nvoid main()\n{\n    gl_Position = vec4(a_position, 1.0);\n}";
-            var fragmentShaderSource = "\nprecision mediump float;\nvoid main(){\n    gl_FragColor = vec4(1.0);\n}";
+            var fragmentShaderSource = "\nprecision mediump float;\n\nuniform vec4 u_color;\n\nvoid main(){\n    gl_FragColor = u_color;\n}";
             this._shader = new B2DGAME.Shader("basic", vertexShaderSource, fragmentShaderSource);
         };
         return Engine;
@@ -112,6 +111,155 @@ var B2DGAME;
 var B2DGAME;
 (function (B2DGAME) {
     /**
+     * Represents the information needed for a GLBuffer attribute.
+     */
+    var AttributeInfo = /** @class */ (function () {
+        function AttributeInfo() {
+        }
+        return AttributeInfo;
+    }());
+    B2DGAME.AttributeInfo = AttributeInfo;
+    /**
+    * Represents the WebGL Buffer
+     */
+    var GLBuffer = /** @class */ (function () {
+        /**
+         * Creates a new GL Buffer
+         * @param elementSize The size of the element in this buffer.
+         * @param dataType The data type  of this buffer. Default: gl.Float
+         * @param targetBufferType The Buffer target type. Can be either gl.ARRAY_BUFFER or gl.ELEMENT_ARRAY_BUFFER. Default: gl.ARRAY_BUFFER
+         * @param mode The drawing mode of this buffer. (i.e gl.TRIANGLES or gl.LINES). Default: gl.TRIANGLES
+         */
+        function GLBuffer(elementSize, dataType, targetBufferType, mode) {
+            if (dataType === void 0) { dataType = B2DGAME.gl.FLOAT; }
+            if (targetBufferType === void 0) { targetBufferType = B2DGAME.gl.ARRAY_BUFFER; }
+            if (mode === void 0) { mode = B2DGAME.gl.TRIANGLES; }
+            this._hasAttributeLocation = false;
+            this._data = [];
+            this._attributes = [];
+            this._elementSize = elementSize;
+            this._dataType = dataType;
+            this._targetBufferType = targetBufferType;
+            this._mode = mode;
+            //Determine byte size
+            switch (this._dataType) {
+                case B2DGAME.gl.FLOAT:
+                case B2DGAME.gl.INT:
+                case B2DGAME.gl.UNSIGNED_INT:
+                    this._typeSize = 4;
+                    break;
+                case B2DGAME.gl.SHORT:
+                case B2DGAME.gl.UNSIGNED_SHORT:
+                    this._typeSize = 2;
+                    break;
+                case B2DGAME.gl.BYTE:
+                case B2DGAME.gl.UNSIGNED_BYTE:
+                    this._typeSize = 1;
+                    break;
+                default:
+                    throw new Error("Unrecognized data type: " + dataType.toString());
+            }
+            this._stride = this._elementSize * this._typeSize;
+            this._buffer = B2DGAME.gl.createBuffer();
+        }
+        /**
+        * Destroys this buffer
+        */
+        GLBuffer.prototype.destroy = function () {
+            B2DGAME.gl.deleteBuffer(this._buffer);
+        };
+        /**
+         * Binds this buffer
+         * @param normalized Indicate if the data should be normalized. Default: false
+         */
+        GLBuffer.prototype.bind = function (normalized) {
+            if (normalized === void 0) { normalized = false; }
+            B2DGAME.gl.bindBuffer(this._targetBufferType, this._buffer);
+            if (this._hasAttributeLocation) {
+                for (var _i = 0, _a = this._attributes; _i < _a.length; _i++) {
+                    var it = _a[_i];
+                    B2DGAME.gl.vertexAttribPointer(it.location, it.size, this._dataType, normalized, this._stride, it.offset * this._typeSize);
+                    B2DGAME.gl.enableVertexAttribArray(it.location);
+                }
+            }
+        };
+        /**
+        * Unbinds this buffer
+        */
+        GLBuffer.prototype.unbind = function () {
+            for (var _i = 0, _a = this._attributes; _i < _a.length; _i++) {
+                var it = _a[_i];
+                B2DGAME.gl.disableVertexAttribArray(it.location);
+            }
+            B2DGAME.gl.bindBuffer(B2DGAME.gl.ARRAY_BUFFER, this._buffer);
+        };
+        /**
+         * Adds an attribute with the provided information to this buffer
+         * @param info Information to be added.
+         */
+        GLBuffer.prototype.addAttributeLocation = function (info) {
+            this._hasAttributeLocation = true;
+            this._attributes.push(info);
+        };
+        /**
+         * Add data to this buffer
+         * @param data
+         */
+        GLBuffer.prototype.pushBackData = function (data) {
+            for (var _i = 0, data_1 = data; _i < data_1.length; _i++) {
+                var d = data_1[_i];
+                this._data.push(d);
+            }
+        };
+        /**
+        * Uploads this buffer data to the GPU
+        */
+        GLBuffer.prototype.upload = function () {
+            B2DGAME.gl.bindBuffer(this._targetBufferType, this._buffer);
+            var bufferData;
+            switch (this._dataType) {
+                case B2DGAME.gl.FLOAT:
+                    bufferData = new Float32Array(this._data);
+                    break;
+                case B2DGAME.gl.INT:
+                    bufferData = new Int32Array(this._data);
+                    break;
+                case B2DGAME.gl.UNSIGNED_INT:
+                    bufferData = new Uint32Array(this._data);
+                    break;
+                case B2DGAME.gl.SHORT:
+                    bufferData = new Int16Array(this._data);
+                    break;
+                case B2DGAME.gl.UNSIGNED_SHORT:
+                    bufferData = new Uint16Array(this._data);
+                    break;
+                case B2DGAME.gl.BYTE:
+                    bufferData = new Int8Array(this._data);
+                    break;
+                case B2DGAME.gl.UNSIGNED_BYTE:
+                    bufferData = new Uint8Array(this._data);
+                    break;
+            }
+            B2DGAME.gl.bufferData(this._targetBufferType, bufferData, B2DGAME.gl.STATIC_DRAW);
+        };
+        /**
+        * Draw this buffer
+        */
+        GLBuffer.prototype.draw = function () {
+            if (this._targetBufferType === B2DGAME.gl.ARRAY_BUFFER) {
+                B2DGAME.gl.drawArrays(this._mode, 0, this._data.length / this._elementSize);
+            }
+            else if (this._targetBufferType === B2DGAME.gl.ELEMENT_ARRAY_BUFFER) {
+                B2DGAME.gl.drawElements(this._mode, this._data.length, this._dataType, 0);
+            }
+        };
+        return GLBuffer;
+    }());
+    B2DGAME.GLBuffer = GLBuffer;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    /**
      * Represents a WebGL shader.
      */
     var Shader = /** @class */ (function () {
@@ -122,10 +270,14 @@ var B2DGAME;
          * @param fragmentSource the source of the fragment shader
          */
         function Shader(name, vertexSource, fragmentSource) {
+            this._attributes = {}; //collection of keys
+            this._uniforms = {};
             this._name = name;
             var vertextShader = this.loadShader(vertexSource, B2DGAME.gl.VERTEX_SHADER);
             var fragmentShader = this.loadShader(fragmentSource, B2DGAME.gl.FRAGMENT_SHADER);
             this.createProgram(vertextShader, fragmentShader);
+            this.detectAttribute();
+            this.detectUniforms();
         }
         Object.defineProperty(Shader.prototype, "name", {
             /**
@@ -142,6 +294,26 @@ var B2DGAME;
         */
         Shader.prototype.use = function () {
             B2DGAME.gl.useProgram(this._program);
+        };
+        /**
+         * Get the location of an attribute with the provided name.
+         * @param name The name of the attribute whose location to retrieve.
+         */
+        Shader.prototype.getAttributeLocation = function (name) {
+            if (this._attributes[name] === undefined) {
+                throw new Error("Unable to find attribute'" + name + "' in shader '" + this._name + "'");
+            }
+            return this._attributes[name];
+        };
+        /**
+         * Get the location of an uniform with the provided name.
+         * @param name The name of the uniform whose location to retrieve.
+         */
+        Shader.prototype.getUniformLocation = function (name) {
+            if (this._uniforms[name] === undefined) {
+                throw new Error("Unable to find uniform'" + name + "' in shader '" + this._name + "'");
+            }
+            return this._uniforms[name];
         };
         Shader.prototype.loadShader = function (source, shaderType) {
             var shader = B2DGAME.gl.createShader(shaderType);
@@ -161,6 +333,26 @@ var B2DGAME;
             var error = B2DGAME.gl.getProgramInfoLog(this._program);
             if (error !== "") {
                 throw new Error("Error compiling linking shader: '" + this._name + "': " + error);
+            }
+        };
+        Shader.prototype.detectAttribute = function () {
+            var attributeCount = B2DGAME.gl.getProgramParameter(this._program, B2DGAME.gl.ACTIVE_ATTRIBUTES);
+            for (var i = 0; i < attributeCount; i++) {
+                var info = B2DGAME.gl.getActiveAttrib(this._program, i);
+                if (!info) {
+                    break;
+                }
+                this._attributes[info.name] = B2DGAME.gl.getAttribLocation(this._program, info.name);
+            }
+        };
+        Shader.prototype.detectUniforms = function () {
+            var uniformCount = B2DGAME.gl.getProgramParameter(this._program, B2DGAME.gl.ACTIVE_UNIFORMS);
+            for (var i = 0; i < uniformCount; i++) {
+                var info = B2DGAME.gl.getActiveUniform(this._program, i);
+                if (!info) {
+                    break;
+                }
+                this._uniforms[info.name] = B2DGAME.gl.getUniformLocation(this._program, info.name);
             }
         };
         return Shader;
