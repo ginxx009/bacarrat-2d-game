@@ -26,6 +26,7 @@ var B2DGAME;
             B2DGAME.gl.clearColor(0, 0, 0, 1);
             this.loadShaders();
             this._shader.use();
+            this.createBuffer();
             this.loop();
         };
         /**
@@ -35,13 +36,35 @@ var B2DGAME;
             if (this._canvas !== undefined) {
                 this._canvas.width = window.innerWidth;
                 this._canvas.height = window.innerHeight;
+                B2DGAME.gl.viewport(0, 0, this._canvas.width, this._canvas.height);
             }
         };
         Engine.prototype.loop = function () {
             //clear the color buffer of the screen before you present an image to the screen
             B2DGAME.gl.clear(B2DGAME.gl.COLOR_BUFFER_BIT);
+            //draw the buffer
+            B2DGAME.gl.bindBuffer(B2DGAME.gl.ARRAY_BUFFER, this._buffer);
+            B2DGAME.gl.vertexAttribPointer(0, 3, B2DGAME.gl.FLOAT, false, 0, 0);
+            B2DGAME.gl.enableVertexAttribArray(0);
+            this.resize();
+            B2DGAME.gl.drawArrays(B2DGAME.gl.TRIANGLES, 0, 3);
             //want to call loop against this particular instance of the engine
             requestAnimationFrame(this.loop.bind(this));
+        };
+        Engine.prototype.createBuffer = function () {
+            this._buffer = B2DGAME.gl.createBuffer();
+            var vertices = [
+                //x y z
+                0, 0, 0,
+                0, 0.5, 0,
+                0.5, 0.5, 0
+            ];
+            B2DGAME.gl.bindBuffer(B2DGAME.gl.ARRAY_BUFFER, this._buffer);
+            B2DGAME.gl.vertexAttribPointer(0, 3, B2DGAME.gl.FLOAT, false, 0, 0);
+            B2DGAME.gl.enableVertexAttribArray(0);
+            B2DGAME.gl.bufferData(B2DGAME.gl.ARRAY_BUFFER, new Float32Array(vertices), B2DGAME.gl.STATIC_DRAW);
+            B2DGAME.gl.bindBuffer(B2DGAME.gl.ARRAY_BUFFER, undefined);
+            B2DGAME.gl.disableVertexAttribArray(0);
         };
         Engine.prototype.loadShaders = function () {
             var vertexShaderSource = "\nattribute vec3 a_position;\nvoid main()\n{\n    gl_Position = vec4(a_position, 1.0);\n}";

@@ -7,6 +7,8 @@
         
         private _canvas: HTMLCanvasElement;
         private _shader: Shader;
+        private _buffer: WebGLBuffer;
+
         /**
          * Creates a new engine
          */
@@ -25,6 +27,7 @@
 
             this.loadShaders();
             this._shader.use();
+            this.createBuffer();
 
             this.loop();
         }
@@ -36,6 +39,8 @@
             if (this._canvas !== undefined) {
                 this._canvas.width = window.innerWidth;
                 this._canvas.height = window.innerHeight;
+
+                gl.viewport(0, 0, this._canvas.width, this._canvas.height);
             }
         }
 
@@ -43,9 +48,36 @@
             //clear the color buffer of the screen before you present an image to the screen
             gl.clear(gl.COLOR_BUFFER_BIT);
 
+            //draw the buffer
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._buffer);
+
+            gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(0);
+
+            this.resize();
+
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
 
             //want to call loop against this particular instance of the engine
             requestAnimationFrame(this.loop.bind(this));
+        }
+
+        private createBuffer(): void {
+            this._buffer = gl.createBuffer();
+
+            let vertices = [
+               //x y z
+                0, 0, 0,
+                0, 0.5, 0,
+                0.5, 0.5, 0
+            ]
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._buffer);
+            gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(0);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, undefined);
+            gl.disableVertexAttribArray(0);
         }
 
         private loadShaders(): void {
