@@ -1,5 +1,8 @@
 ﻿namespace B2DGAME {
 
+    /**
+    * Represents a 2- Dimensional sprite which is drawn on the screen
+    */
     export class Sprite {
 
         private _width: number;
@@ -7,13 +10,26 @@
         private _name: string;
 
         private _buffer: GLBuffer;
+        /**
+        * The position of this sprite
+        */
+        public position: Vector3 = new Vector3();
 
+        /**
+         *  Creates a new sprite
+         * @param name The name of this sprite
+         * @param width The width of this sprite
+         * @param height The height of this sprite
+         */
         public constructor(name:string, width:number = 100, height:number = 100) {
             this._name = name;
             this._width = width;
             this._height = height;
         }
 
+        /**
+        * Performs loading routines on this sprite
+        */
         public load():void {
             this._buffer = new GLBuffer(3);
 
