@@ -26,7 +26,11 @@ var B2DGAME;
             B2DGAME.gl.clearColor(0, 0, 0, 1);
             this.loadShaders();
             this._shader.use();
-            this.createBuffer();
+            this._projection = B2DGAME.Matrix4x4.orthographic(0, this._canvas.width, 0, this._canvas.height, -1.0, 100.0);
+            //Load
+            this._sprite = new B2DGAME.Sprite("test");
+            this._sprite.load();
+            this.resize();
             this.loop();
         };
         /**
@@ -44,29 +48,14 @@ var B2DGAME;
             //Set uniform
             var colorPosition = this._shader.getUniformLocation("u_color");
             B2DGAME.gl.uniform4f(colorPosition, 1, 0.5, 0, 1);
-            this._buffer.bind();
-            this._buffer.draw();
+            var projectLocation = this._shader.getUniformLocation("u_projection");
+            B2DGAME.gl.uniformMatrix4fv(projectLocation, false, new Float32Array(this._projection.data));
+            //draw
+            this._sprite.draw();
             requestAnimationFrame(this.loop.bind(this));
         };
-        Engine.prototype.createBuffer = function () {
-            this._buffer = new B2DGAME.GLBuffer(3);
-            var positionAttribute = new B2DGAME.AttributeInfo();
-            positionAttribute.location = this._shader.getAttributeLocation("a_position");
-            positionAttribute.offset = 0;
-            positionAttribute.size = 3;
-            this._buffer.addAttributeLocation(positionAttribute);
-            var vertices = [
-                //x y z
-                0, 0, 0,
-                0, 0.5, 0,
-                0.5, 0.5, 0
-            ];
-            this._buffer.pushBackData(vertices);
-            this._buffer.upload();
-            this._buffer.unbind();
-        };
         Engine.prototype.loadShaders = function () {
-            var vertexShaderSource = "\nattribute vec3 a_position;\nvoid main()\n{\n    gl_Position = vec4(a_position, 1.0);\n}";
+            var vertexShaderSource = "\nattribute vec3 a_position;\n\nuniform mat4 u_projection;\n\nvoid main()\n{\n    gl_Position = u_projection * vec4(a_position, 1.0);\n}";
             var fragmentShaderSource = "\nprecision mediump float;\n\nuniform vec4 u_color;\n\nvoid main(){\n    gl_FragColor = u_color;\n}";
             this._shader = new B2DGAME.Shader("basic", vertexShaderSource, fragmentShaderSource);
         };
@@ -358,5 +347,85 @@ var B2DGAME;
         return Shader;
     }());
     B2DGAME.Shader = Shader;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var Sprite = /** @class */ (function () {
+        function Sprite(name, width, height) {
+            if (width === void 0) { width = 10; }
+            if (height === void 0) { height = 10; }
+            this._name = name;
+            this._width = width;
+            this._height = height;
+        }
+        Sprite.prototype.load = function () {
+            this._buffer = new B2DGAME.GLBuffer(3);
+            var positionAttribute = new B2DGAME.AttributeInfo();
+            positionAttribute.location = 0;
+            positionAttribute.offset = 0;
+            positionAttribute.size = 3;
+            this._buffer.addAttributeLocation(positionAttribute);
+            var vertices = [
+                //x y z
+                0, 0, 0,
+                0, 0.5, 0,
+                0.5, 0.5, 0,
+                0.5, 0.5, 0,
+                0.5, 0.0, 0,
+                0, 0, 0
+            ];
+            this._buffer.pushBackData(vertices);
+            this._buffer.upload();
+            this._buffer.unbind();
+        };
+        Sprite.prototype.update = function (time) {
+        };
+        Sprite.prototype.draw = function () {
+            this._buffer.bind();
+            this._buffer.draw();
+        };
+        return Sprite;
+    }());
+    B2DGAME.Sprite = Sprite;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var Matrix4x4 = /** @class */ (function () {
+        function Matrix4x4() {
+            this._data = [];
+            //Identity Matrix (Default Matrix)
+            this._data = [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            ];
+        }
+        Object.defineProperty(Matrix4x4.prototype, "data", {
+            get: function () {
+                return this._data;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Matrix4x4.identity = function () {
+            return new Matrix4x4();
+        };
+        Matrix4x4.orthographic = function (left, right, bottom, top, nearclip, farclip) {
+            var m = new Matrix4x4();
+            var lr = 1.0 / (left - right);
+            var bt = 1.0 / (bottom - top);
+            var nf = 1.0 / (nearclip - farclip);
+            m._data[0] = -2.0 * lr;
+            m._data[5] = -2.0 * bt;
+            m._data[10] = 2.0 * nf;
+            m._data[12] = (left + top) * lr;
+            m._data[13] = (top + bottom) * bt;
+            m._data[14] = (farclip + nearclip) * nf;
+            return m;
+        };
+        return Matrix4x4;
+    }());
+    B2DGAME.Matrix4x4 = Matrix4x4;
 })(B2DGAME || (B2DGAME = {}));
 //# sourceMappingURL=main.js.map

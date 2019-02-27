@@ -7,7 +7,10 @@
         
         private _canvas: HTMLCanvasElement;
         private _shader: Shader;
-        private _buffer: GLBuffer;
+
+        private _projection: Matrix4x4;
+
+        private _sprite: Sprite;
 
         /**
          * Creates a new engine
@@ -27,8 +30,14 @@
 
             this.loadShaders();
             this._shader.use();
-            this.createBuffer();
 
+            this._projection = Matrix4x4.orthographic(0,this._canvas.width,0,this._canvas.height,-1.0,100.0);
+
+            //Load
+            this._sprite = new Sprite("test");
+            this._sprite.load();
+
+            this.resize();
             this.loop();
         }
 
@@ -50,40 +59,25 @@
             //Set uniform
             let colorPosition = this._shader.getUniformLocation("u_color");
             gl.uniform4f(colorPosition, 1, 0.5, 0, 1);
-            
-            this._buffer.bind();
-            this._buffer.draw();
-            
+
+            let projectLocation = this._shader.getUniformLocation("u_projection");
+            gl.uniformMatrix4fv(projectLocation,false,new Float32Array(this._projection.data));
+
+            //draw
+            this._sprite.draw();
+
             requestAnimationFrame(this.loop.bind(this));
         }
-
-        private createBuffer(): void {
-            this._buffer = new GLBuffer(3);
-
-            let positionAttribute = new AttributeInfo();
-            positionAttribute.location = this._shader.getAttributeLocation("a_position");
-            positionAttribute.offset = 0;
-            positionAttribute.size = 3;
-            this._buffer.addAttributeLocation(positionAttribute);
-
-            let vertices = [
-               //x y z
-                0, 0, 0,
-                0, 0.5, 0,
-                0.5, 0.5, 0
-            ]
-
-            this._buffer.pushBackData(vertices);
-            this._buffer.upload();
-            this._buffer.unbind();
-        }
-
+        
         private loadShaders(): void {
             let vertexShaderSource = `
 attribute vec3 a_position;
+
+uniform mat4 u_projection;
+
 void main()
 {
-    gl_Position = vec4(a_position, 1.0);
+    gl_Position = u_projection * vec4(a_position, 1.0);
 }`;
             let fragmentShaderSource = `
 precision mediump float;
