@@ -40,7 +40,7 @@ var B2DGAME;
             if (this._canvas !== undefined) {
                 this._canvas.width = window.innerWidth;
                 this._canvas.height = window.innerHeight;
-                B2DGAME.gl.viewport(0, 0, this._canvas.width, this._canvas.height);
+                B2DGAME.gl.viewport(-1, 1, 1, -1);
             }
         };
         Engine.prototype.loop = function () {
@@ -352,8 +352,8 @@ var B2DGAME;
 (function (B2DGAME) {
     var Sprite = /** @class */ (function () {
         function Sprite(name, width, height) {
-            if (width === void 0) { width = 10; }
-            if (height === void 0) { height = 10; }
+            if (width === void 0) { width = 100; }
+            if (height === void 0) { height = 100; }
             this._name = name;
             this._width = width;
             this._height = height;
@@ -368,10 +368,10 @@ var B2DGAME;
             var vertices = [
                 //x y z
                 0, 0, 0,
-                0, 0.5, 0,
-                0.5, 0.5, 0,
-                0.5, 0.5, 0,
-                0.5, 0.0, 0,
+                0, this._height, 0,
+                this._width, this._height, 0,
+                this._width, this._height, 0,
+                this._width, 0.0, 0,
                 0, 0, 0
             ];
             this._buffer.pushBackData(vertices);
