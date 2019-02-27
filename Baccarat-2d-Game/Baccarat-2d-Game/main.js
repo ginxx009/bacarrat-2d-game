@@ -126,12 +126,13 @@ var B2DGAME;
          */
         Engine.prototype.start = function () {
             this._canvas = B2DGAME.GLUtilities.initialize();
+            B2DGAME.AssetManager.initialize();
             B2DGAME.gl.clearColor(0, 0, 0, 1);
             this.loadShaders();
             this._shader.use();
             this._projection = B2DGAME.Matrix4x4.orthographic(0, this._canvas.width, 0, this._canvas.height, -100.0, 100.0);
             //Load
-            this._sprite = new B2DGAME.Sprite("test");
+            this._sprite = new B2DGAME.Sprite("test", "assets/textures/sample.jpg");
             this._sprite.load();
             this._sprite.position.x = 200;
             this.resize();
@@ -149,21 +150,23 @@ var B2DGAME;
             }
         };
         Engine.prototype.loop = function () {
+            B2DGAME.MessageBus.update(0);
             B2DGAME.gl.clear(B2DGAME.gl.COLOR_BUFFER_BIT);
             //Set uniform
-            var colorPosition = this._shader.getUniformLocation("u_color");
-            B2DGAME.gl.uniform4f(colorPosition, 1, 0.5, 0, 1);
+            var colorPosition = this._shader.getUniformLocation("u_tint");
+            //gl.uniform4f(colorPosition, 1, 0.5, 0, 1);
+            B2DGAME.gl.uniform4f(colorPosition, 1, 1, 1, 1);
             var projectLocation = this._shader.getUniformLocation("u_projection");
             B2DGAME.gl.uniformMatrix4fv(projectLocation, false, new Float32Array(this._projection.data));
             var modelLocation = this._shader.getUniformLocation("u_model");
             B2DGAME.gl.uniformMatrix4fv(modelLocation, false, new Float32Array(B2DGAME.Matrix4x4.translation(this._sprite.position).data));
             //draw
-            this._sprite.draw();
+            this._sprite.draw(this._shader);
             requestAnimationFrame(this.loop.bind(this));
         };
         Engine.prototype.loadShaders = function () {
-            var vertexShaderSource = "\nattribute vec3 a_position;\n\nuniform mat4 u_projection;\n\nuniform mat4 u_model;\n\nvoid main()\n{\n    gl_Position = u_projection * u_model * vec4(a_position, 1.0);\n}";
-            var fragmentShaderSource = "\nprecision mediump float;\n\nuniform vec4 u_color;\n\nvoid main(){\n    gl_FragColor = u_color;\n}";
+            var vertexShaderSource = "\nattribute vec3 a_position;\nattribute vec2 a_texCoord;\nuniform mat4 u_projection;\n\nuniform mat4 u_model;\n\nvarying vec2 v_texCoord;\n\nvoid main()\n{\n    gl_Position = u_projection * u_model * vec4(a_position, 1.0);\n    v_texCoord =  a_texCoord;\n}";
+            var fragmentShaderSource = "\nprecision mediump float;\n\nuniform vec4 u_tint;\nuniform sampler2D u_diffuse;\n\nvarying vec2 v_texCoord;\n\nvoid main(){\n    gl_FragColor = u_tint * texture2D(u_diffuse, v_texCoord);\n}";
             this._shader = new B2DGAME.Shader("basic", vertexShaderSource, fragmentShaderSource);
         };
         return Engine;
@@ -496,20 +499,25 @@ var B2DGAME;
         * Performs loading routines on this sprite
         */
         Sprite.prototype.load = function () {
-            this._buffer = new B2DGAME.GLBuffer(3);
+            this._buffer = new B2DGAME.GLBuffer(5);
             var positionAttribute = new B2DGAME.AttributeInfo();
             positionAttribute.location = 0;
             positionAttribute.offset = 0;
             positionAttribute.size = 3;
             this._buffer.addAttributeLocation(positionAttribute);
+            var texCoordAttribute = new B2DGAME.AttributeInfo();
+            texCoordAttribute.location = 1;
+            texCoordAttribute.offset = 3;
+            texCoordAttribute.size = 2;
+            this._buffer.addAttributeLocation(texCoordAttribute);
             var vertices = [
-                //x y z
-                0, 0, 0,
-                0, this._height, 0,
-                this._width, this._height, 0,
-                this._width, this._height, 0,
-                this._width, 0.0, 0,
-                0, 0, 0
+                //x y z   ,u ,v
+                0, 0, 0, 0, 0,
+                0, this._height, 0, 0, 1.0,
+                this._width, this._height, 0, 1.0, 1.0,
+                this._width, this._height, 0, 1.0, 1.0,
+                this._width, 0.0, 0, 1.0, 0,
+                0, 0, 0, 0, 0
             ];
             this._buffer.pushBackData(vertices);
             this._buffer.upload();
@@ -517,8 +525,10 @@ var B2DGAME;
         };
         Sprite.prototype.update = function (time) {
         };
-        Sprite.prototype.draw = function () {
-            this._texture.activateAndBind();
+        Sprite.prototype.draw = function (shader) {
+            this._texture.activateAndBind(0);
+            var diffuseLocation = shader.getUniformLocation("u_diffuse");
+            B2DGAME.gl.uniform1i(diffuseLocation, 0);
             this._buffer.bind();
             this._buffer.draw();
         };
@@ -599,8 +609,23 @@ var B2DGAME;
             this._width = asset.width;
             this._height = asset.height;
             this.bind();
-            B2DGAME.gl.texImage2D(B2DGAME.gl.TEXTURE_2D, LEVEL, B2DGAME.gl.RGBA, this._width, this._height, BORDER, B2DGAME.gl.RGBA, B2DGAME.gl.UNSIGNED_BYTE, asset.data);
-            this.isLoaded = true;
+            B2DGAME.gl.texImage2D(B2DGAME.gl.TEXTURE_2D, LEVEL, B2DGAME.gl.RGBA, B2DGAME.gl.RGBA, B2DGAME.gl.UNSIGNED_BYTE, asset.data);
+            if (this.isPowerof2()) {
+                B2DGAME.gl.generateMipmap(B2DGAME.gl.TEXTURE_2D);
+            }
+            else {
+                // Do not generate a mipmap and clamp to edge.
+                B2DGAME.gl.texParameteri(B2DGAME.gl.TEXTURE_2D, B2DGAME.gl.TEXTURE_WRAP_S, B2DGAME.gl.CLAMP_TO_EDGE);
+                B2DGAME.gl.texParameteri(B2DGAME.gl.TEXTURE_2D, B2DGAME.gl.TEXTURE_WRAP_T, B2DGAME.gl.CLAMP_TO_EDGE);
+                B2DGAME.gl.texParameteri(B2DGAME.gl.TEXTURE_2D, B2DGAME.gl.TEXTURE_MIN_FILTER, B2DGAME.gl.LINEAR);
+            }
+            this._isLoaded = true;
+        };
+        Texture.prototype.isPowerof2 = function () {
+            return (this.isValueof2(this._width) && this.isValueof2(this._height));
+        };
+        Texture.prototype.isValueof2 = function (value) {
+            return (value & (value - 1)) == 0;
         };
         return Texture;
     }());

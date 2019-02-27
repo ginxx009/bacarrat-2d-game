@@ -47,7 +47,7 @@
         * Performs loading routines on this sprite
         */
         public load():void {
-            this._buffer = new GLBuffer(3);
+            this._buffer = new GLBuffer(5);
 
             let positionAttribute = new AttributeInfo();
             positionAttribute.location = 0;
@@ -55,15 +55,21 @@
             positionAttribute.size = 3;
             this._buffer.addAttributeLocation(positionAttribute);
 
-            let vertices = [
-                //x y z
-                0, 0, 0,
-                0, this._height, 0,
-                this._width, this._height, 0,
+            let texCoordAttribute = new AttributeInfo();
+            texCoordAttribute.location = 1;
+            texCoordAttribute.offset = 3;
+            texCoordAttribute.size = 2;
+            this._buffer.addAttributeLocation(texCoordAttribute);
 
-                this._width, this._height, 0,
-                this._width, 0.0, 0,
-                0, 0, 0
+            let vertices = [
+                //x y z   ,u ,v
+                0, 0, 0, 0, 0,
+                0, this._height, 0, 0, 1.0,
+                this._width, this._height, 0, 1.0, 1.0,
+
+                this._width, this._height, 0, 1.0, 1.0,
+                this._width, 0.0, 0, 1.0, 0,
+                0, 0, 0 ,0 ,0
             ]
 
             this._buffer.pushBackData(vertices);
@@ -75,10 +81,12 @@
             
         }
 
-        public draw(): void {
+        public draw(shader: Shader): void {
 
-            this._texture.activateAndBind();
+            this._texture.activateAndBind(0);
 
+            let diffuseLocation = shader.getUniformLocation("u_diffuse");
+            gl.uniform1i(diffuseLocation,0); 
 
             this._buffer.bind();
             this._buffer.draw();

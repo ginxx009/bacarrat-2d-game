@@ -79,8 +79,27 @@
 
             this.bind();
 
-            gl.texImage2D(gl.TEXTURE_2D, LEVEL, gl.RGBA, this._width, this._height, BORDER, gl.RGBA, gl.UNSIGNED_BYTE, asset.data);
-            this.isLoaded = true;
+            gl.texImage2D(gl.TEXTURE_2D, LEVEL, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, asset.data);
+
+            if (this.isPowerof2()) {
+                gl.generateMipmap(gl.TEXTURE_2D);
+            } else {
+
+                // Do not generate a mipmap and clamp to edge.
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            }
+
+            this._isLoaded = true;
+        }
+
+        private isPowerof2(): boolean {
+            return (this.isValueof2(this._width) && this.isValueof2(this._height));
+        }
+
+        private isValueof2(value: number): boolean {
+            return (value & (value - 1)) == 0;
         }
     }
 }
