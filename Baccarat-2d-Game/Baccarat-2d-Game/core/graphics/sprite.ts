@@ -10,6 +10,10 @@
         private _name: string;
 
         private _buffer: GLBuffer;
+        private _textureName: string;
+        private _texture: Texture;
+
+
         /**
         * The position of this sprite
         */
@@ -18,13 +22,25 @@
         /**
          *  Creates a new sprite
          * @param name The name of this sprite
+         * @param textureName The name of the texture to be used.
          * @param width The width of this sprite
          * @param height The height of this sprite
          */
-        public constructor(name:string, width:number = 100, height:number = 100) {
+        public constructor(name: string, textureName: string, width:number = 100, height:number = 100) {
             this._name = name;
             this._width = width;
             this._height = height;
+            this._textureName = textureName;
+            this._texture = TextureManager.getTexture(this._textureName);
+        }
+
+        public get name(): string {
+            return this._name;
+        }
+
+        public destroy():void {
+            this._buffer.destroy();
+            TextureManager.releaseTexture(this._textureName);
         }
 
         /**
@@ -59,7 +75,11 @@
             
         }
 
-        public draw():void {
+        public draw(): void {
+
+            this._texture.activateAndBind();
+
+
             this._buffer.bind();
             this._buffer.draw();
         }

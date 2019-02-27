@@ -464,10 +464,11 @@ var B2DGAME;
         /**
          *  Creates a new sprite
          * @param name The name of this sprite
+         * @param textureName The name of the texture to be used.
          * @param width The width of this sprite
          * @param height The height of this sprite
          */
-        function Sprite(name, width, height) {
+        function Sprite(name, textureName, width, height) {
             if (width === void 0) { width = 100; }
             if (height === void 0) { height = 100; }
             /**
@@ -477,7 +478,20 @@ var B2DGAME;
             this._name = name;
             this._width = width;
             this._height = height;
+            this._textureName = textureName;
+            this._texture = B2DGAME.TextureManager.getTexture(this._textureName);
         }
+        Object.defineProperty(Sprite.prototype, "name", {
+            get: function () {
+                return this._name;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Sprite.prototype.destroy = function () {
+            this._buffer.destroy();
+            B2DGAME.TextureManager.releaseTexture(this._textureName);
+        };
         /**
         * Performs loading routines on this sprite
         */
@@ -504,12 +518,135 @@ var B2DGAME;
         Sprite.prototype.update = function (time) {
         };
         Sprite.prototype.draw = function () {
+            this._texture.activateAndBind();
             this._buffer.bind();
             this._buffer.draw();
         };
         return Sprite;
     }());
     B2DGAME.Sprite = Sprite;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var LEVEL = 0;
+    var BORDER = 0;
+    var TEMP_IMAGE_DATA = new Uint8Array([255, 255, 255, 255]);
+    var Texture = /** @class */ (function () {
+        function Texture(name, width, height) {
+            if (width === void 0) { width = 1; }
+            if (height === void 0) { height = 1; }
+            this._isLoaded = false;
+            this._name = name;
+            this._width = width;
+            this._height = height;
+            this._handle = B2DGAME.gl.createTexture();
+            B2DGAME.Message.subscribe(B2DGAME.MESSAGE_ASSET_LOADER_ASSET_LOADED + this._name, this);
+            this.bind();
+            B2DGAME.gl.texImage2D(B2DGAME.gl.TEXTURE_2D, LEVEL, B2DGAME.gl.RGBA, 1, 1, BORDER, B2DGAME.gl.RGBA, B2DGAME.gl.UNSIGNED_BYTE, TEMP_IMAGE_DATA);
+            var asset = B2DGAME.AssetManager.getAsset(this.name);
+            if (asset !== undefined) {
+                this.loadTextureFromAsset(asset);
+            }
+        }
+        Object.defineProperty(Texture.prototype, "name", {
+            get: function () {
+                return this._name;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Texture.prototype, "isLoaded", {
+            get: function () {
+                return this._isLoaded;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Texture.prototype, "width", {
+            get: function () {
+                return this._width;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Texture.prototype, "height", {
+            get: function () {
+                return this._height;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Texture.prototype.destroy = function () {
+            B2DGAME.gl.deleteTexture(this._handle);
+        };
+        Texture.prototype.activateAndBind = function (textureUnit) {
+            if (textureUnit === void 0) { textureUnit = 0; }
+            B2DGAME.gl.activeTexture(B2DGAME.gl.TEXTURE0 + textureUnit);
+            this.bind();
+        };
+        Texture.prototype.bind = function () {
+            B2DGAME.gl.bindTexture(B2DGAME.gl.TEXTURE_2D, this._handle);
+        };
+        Texture.prototype.unbind = function () {
+            B2DGAME.gl.bindTexture(B2DGAME.gl.TEXTURE_2D, undefined);
+        };
+        Texture.prototype.onMessage = function (message) {
+            if (message.code === B2DGAME.MESSAGE_ASSET_LOADER_ASSET_LOADED + this.name) {
+                this.loadTextureFromAsset(message.context);
+            }
+        };
+        Texture.prototype.loadTextureFromAsset = function (asset) {
+            this._width = asset.width;
+            this._height = asset.height;
+            this.bind();
+            B2DGAME.gl.texImage2D(B2DGAME.gl.TEXTURE_2D, LEVEL, B2DGAME.gl.RGBA, this._width, this._height, BORDER, B2DGAME.gl.RGBA, B2DGAME.gl.UNSIGNED_BYTE, asset.data);
+            this.isLoaded = true;
+        };
+        return Texture;
+    }());
+    B2DGAME.Texture = Texture;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var TextureReferenceNode = /** @class */ (function () {
+        function TextureReferenceNode(texture) {
+            this.referenceCount = 1;
+            this.texture = texture;
+        }
+        return TextureReferenceNode;
+    }());
+    var TextureManager = /** @class */ (function () {
+        function TextureManager() {
+        }
+        TextureManager.prototype.contructor = function () {
+        };
+        TextureManager.getTexture = function (textureName) {
+            if (TextureManager._texture[textureName] === undefined) {
+                var texture = new B2DGAME.Texture(textureName);
+                TextureManager._texture[textureName] = new TextureReferenceNode(texture);
+            }
+            else {
+                TextureManager._texture[textureName].referenceCount++;
+            }
+            return TextureManager._texture[textureName].texture;
+        };
+        TextureManager.releaseTexture = function (textureName) {
+            if (TextureManager._texture[textureName] === undefined) {
+                console.warn("A texture named $(textureName) does not exist and therefore cannot be released");
+            }
+            else {
+                TextureManager._texture[textureName].referenceCount--;
+                if (TextureManager._texture[textureName].referenceCount < 1) {
+                    TextureManager._texture[textureName].texture.destroy();
+                    TextureManager._texture[textureName] = undefined;
+                    delete TextureManager._texture[textureName];
+                }
+            }
+        };
+        TextureManager._texture = {};
+        return TextureManager;
+    }());
+    B2DGAME.TextureManager = TextureManager;
 })(B2DGAME || (B2DGAME = {}));
 var B2DGAME;
 (function (B2DGAME) {
@@ -557,6 +694,53 @@ var B2DGAME;
         return Matrix4x4;
     }());
     B2DGAME.Matrix4x4 = Matrix4x4;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    /**
+    * Represents a 2-component vector.
+     */
+    var Vector2 = /** @class */ (function () {
+        /**
+         *  Creates a new Vector 2
+         * @param x The x component
+         * @param y The y component
+         */
+        function Vector2(x, y) {
+            if (x === void 0) { x = 0; }
+            if (y === void 0) { y = 0; }
+            this._x = x;
+            this._y = y;
+        }
+        Object.defineProperty(Vector2.prototype, "x", {
+            get: function () {
+                return this._x;
+            },
+            set: function (value) {
+                this._x = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Vector2.prototype, "y", {
+            get: function () {
+                return this._y;
+            },
+            set: function (value) {
+                this._y = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Vector2.prototype.toArray = function () {
+            return [this._x, this._y];
+        };
+        Vector2.prototype.toFloat32Array = function () {
+            return new Float32Array(this.toArray());
+        };
+        return Vector2;
+    }());
+    B2DGAME.Vector2 = Vector2;
 })(B2DGAME || (B2DGAME = {}));
 var B2DGAME;
 (function (B2DGAME) {
