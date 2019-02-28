@@ -26,7 +26,7 @@
          * @param width The width of this sprite
          * @param height The height of this sprite
          */
-        public constructor(name: string, textureName: string, width:number = 100, height:number = 100) {
+        public constructor(name: string, textureName: string, width:number = 200, height:number = 200) {
             this._name = name;
             this._width = width;
             this._height = height;

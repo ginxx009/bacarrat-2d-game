@@ -31,12 +31,13 @@
             this.loadShaders();
             this._shader.use();
 
-            this._projection = Matrix4x4.orthographic(0,this._canvas.width,0,this._canvas.height,-100.0,100.0);
+            this._projection = Matrix4x4.orthographic(0,this._canvas.width,this._canvas.height,0,-100.0,100.0);
 
             //Load
             this._sprite = new Sprite("test","assets/textures/sample.jpg");
             this._sprite.load();
             this._sprite.position.x = 200;
+            this._sprite.position.y = 100;
 
 
             this.resize();
@@ -53,7 +54,9 @@
 
                 //gl.viewport(0, 0, this._canvas.width, this._canvas.height);
 
-                gl.viewport(-1, 1 ,-1, 1);
+                gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+                this._projection = Matrix4x4.orthographic(0, this._canvas.width, this._canvas.height, 0, -100.0, 100.0);
+
             }
         }
 

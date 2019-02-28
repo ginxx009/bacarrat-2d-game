@@ -130,11 +130,12 @@ var B2DGAME;
             B2DGAME.gl.clearColor(0, 0, 0, 1);
             this.loadShaders();
             this._shader.use();
-            this._projection = B2DGAME.Matrix4x4.orthographic(0, this._canvas.width, 0, this._canvas.height, -100.0, 100.0);
+            this._projection = B2DGAME.Matrix4x4.orthographic(0, this._canvas.width, this._canvas.height, 0, -100.0, 100.0);
             //Load
             this._sprite = new B2DGAME.Sprite("test", "assets/textures/sample.jpg");
             this._sprite.load();
             this._sprite.position.x = 200;
+            this._sprite.position.y = 100;
             this.resize();
             this.loop();
         };
@@ -146,7 +147,8 @@ var B2DGAME;
                 this._canvas.width = window.innerWidth;
                 this._canvas.height = window.innerHeight;
                 //gl.viewport(0, 0, this._canvas.width, this._canvas.height);
-                B2DGAME.gl.viewport(-1, 1, -1, 1);
+                B2DGAME.gl.viewport(0, 0, B2DGAME.gl.canvas.width, B2DGAME.gl.canvas.height);
+                this._projection = B2DGAME.Matrix4x4.orthographic(0, this._canvas.width, this._canvas.height, 0, -100.0, 100.0);
             }
         };
         Engine.prototype.loop = function () {
@@ -472,8 +474,8 @@ var B2DGAME;
          * @param height The height of this sprite
          */
         function Sprite(name, textureName, width, height) {
-            if (width === void 0) { width = 100; }
-            if (height === void 0) { height = 100; }
+            if (width === void 0) { width = 200; }
+            if (height === void 0) { height = 200; }
             /**
             * The position of this sprite
             */
