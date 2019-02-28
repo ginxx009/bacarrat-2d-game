@@ -4,7 +4,7 @@
     /**
      * Represents a WebGL shader.
      */
-    export class Shader {
+    export abstract class Shader {
 
         private _name: string;
         private _program: WebGLProgram;
@@ -14,19 +14,10 @@
         /**
          * Creates a new shader
          * @param name
-         * @param vertexSource the source of the vertex shader
-         * @param fragmentSource the source of the fragment shader
          */
 
-        public constructor(name: string, vertexSource: string, fragmentSource: string) {
+        public constructor(name: string) {
             this._name = name;
-            let vertextShader = this.loadShader(vertexSource, gl.VERTEX_SHADER);
-            let fragmentShader = this.loadShader(fragmentSource, gl.FRAGMENT_SHADER);
-
-            this.createProgram(vertextShader, fragmentShader);
-
-            this.detectAttribute();
-            this.detectUniforms();
         }
 
         /**
@@ -63,6 +54,17 @@
                 throw new Error(`Unable to find uniform'${name}' in shader '${this._name}'`);
             }
             return this._uniforms[name];
+        }
+
+        protected load(vertexSource: string, fragmentSource: string): void {
+
+            let vertextShader = this.loadShader(vertexSource, gl.VERTEX_SHADER);
+            let fragmentShader = this.loadShader(fragmentSource, gl.FRAGMENT_SHADER);
+
+            this.createProgram(vertextShader, fragmentShader);
+
+            this.detectAttribute();
+            this.detectUniforms();
         }
 
         private loadShader(source: string, shaderType:number): WebGLShader {

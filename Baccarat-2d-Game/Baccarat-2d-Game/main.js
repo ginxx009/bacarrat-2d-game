@@ -1,3 +1,16 @@
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    }
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 var engine;
 //The main entry point of the application
 window.onload = function () {
@@ -128,11 +141,13 @@ var B2DGAME;
             this._canvas = B2DGAME.GLUtilities.initialize();
             B2DGAME.AssetManager.initialize();
             B2DGAME.gl.clearColor(0, 0, 0, 1);
-            this.loadShaders();
-            this._shader.use();
+            this._basicshader = new B2DGAME.BasicShader();
+            this._basicshader.use();
             this._projection = B2DGAME.Matrix4x4.orthographic(0, this._canvas.width, this._canvas.height, 0, -100.0, 100.0);
+            //Load Material
+            B2DGAME.MaterialManager.registerMaterial(new B2DGAME.Material("crate", "assets/textures/sample.jpg", new B2DGAME.Color(255, 128, 0, 255)));
             //Load
-            this._sprite = new B2DGAME.Sprite("test", "assets/textures/sample.jpg");
+            this._sprite = new B2DGAME.Sprite("test", "crate");
             this._sprite.load();
             this._sprite.position.x = 200;
             this._sprite.position.y = 100;
@@ -155,21 +170,11 @@ var B2DGAME;
             B2DGAME.MessageBus.update(0);
             B2DGAME.gl.clear(B2DGAME.gl.COLOR_BUFFER_BIT);
             //Set uniform
-            var colorPosition = this._shader.getUniformLocation("u_tint");
-            //gl.uniform4f(colorPosition, 1, 0.5, 0, 1);
-            B2DGAME.gl.uniform4f(colorPosition, 1, 1, 1, 1);
-            var projectLocation = this._shader.getUniformLocation("u_projection");
+            var projectLocation = this._basicshader.getUniformLocation("u_projection");
             B2DGAME.gl.uniformMatrix4fv(projectLocation, false, new Float32Array(this._projection.data));
-            var modelLocation = this._shader.getUniformLocation("u_model");
-            B2DGAME.gl.uniformMatrix4fv(modelLocation, false, new Float32Array(B2DGAME.Matrix4x4.translation(this._sprite.position).data));
             //draw
-            this._sprite.draw(this._shader);
+            this._sprite.draw(this._basicshader);
             requestAnimationFrame(this.loop.bind(this));
-        };
-        Engine.prototype.loadShaders = function () {
-            var vertexShaderSource = "\nattribute vec3 a_position;\nattribute vec2 a_texCoord;\nuniform mat4 u_projection;\n\nuniform mat4 u_model;\n\nvarying vec2 v_texCoord;\n\nvoid main()\n{\n    gl_Position = u_projection * u_model * vec4(a_position, 1.0);\n    v_texCoord =  a_texCoord;\n}";
-            var fragmentShaderSource = "\nprecision mediump float;\n\nuniform vec4 u_tint;\nuniform sampler2D u_diffuse;\n\nvarying vec2 v_texCoord;\n\nvoid main(){\n    gl_FragColor = u_tint * texture2D(u_diffuse, v_texCoord);\n}";
-            this._shader = new B2DGAME.Shader("basic", vertexShaderSource, fragmentShaderSource);
         };
         return Engine;
     }());
@@ -367,18 +372,11 @@ var B2DGAME;
         /**
          * Creates a new shader
          * @param name
-         * @param vertexSource the source of the vertex shader
-         * @param fragmentSource the source of the fragment shader
          */
-        function Shader(name, vertexSource, fragmentSource) {
+        function Shader(name) {
             this._attributes = {}; //collection of keys
             this._uniforms = {};
             this._name = name;
-            var vertextShader = this.loadShader(vertexSource, B2DGAME.gl.VERTEX_SHADER);
-            var fragmentShader = this.loadShader(fragmentSource, B2DGAME.gl.FRAGMENT_SHADER);
-            this.createProgram(vertextShader, fragmentShader);
-            this.detectAttribute();
-            this.detectUniforms();
         }
         Object.defineProperty(Shader.prototype, "name", {
             /**
@@ -415,6 +413,13 @@ var B2DGAME;
                 throw new Error("Unable to find uniform'" + name + "' in shader '" + this._name + "'");
             }
             return this._uniforms[name];
+        };
+        Shader.prototype.load = function (vertexSource, fragmentSource) {
+            var vertextShader = this.loadShader(vertexSource, B2DGAME.gl.VERTEX_SHADER);
+            var fragmentShader = this.loadShader(fragmentSource, B2DGAME.gl.FRAGMENT_SHADER);
+            this.createProgram(vertextShader, fragmentShader);
+            this.detectAttribute();
+            this.detectUniforms();
         };
         Shader.prototype.loadShader = function (source, shaderType) {
             var shader = B2DGAME.gl.createShader(shaderType);
@@ -462,6 +467,234 @@ var B2DGAME;
 })(B2DGAME || (B2DGAME = {}));
 var B2DGAME;
 (function (B2DGAME) {
+    var BasicShader = /** @class */ (function (_super) {
+        __extends(BasicShader, _super);
+        function BasicShader() {
+            var _this = _super.call(this, "basic") || this;
+            _this.load(_this.getVertexSource(), _this.getFragmentSource());
+            return _this;
+        }
+        BasicShader.prototype.getVertexSource = function () {
+            return "\nattribute vec3 a_position;\nattribute vec2 a_texCoord;\nuniform mat4 u_projection;\n\nuniform mat4 u_model;\n\nvarying vec2 v_texCoord;\n\nvoid main()\n{\n    gl_Position = u_projection * u_model * vec4(a_position, 1.0);\n    v_texCoord =  a_texCoord;\n}";
+        };
+        BasicShader.prototype.getFragmentSource = function () {
+            return "\nprecision mediump float;\n\nuniform vec4 u_tint;\nuniform sampler2D u_diffuse;\n\nvarying vec2 v_texCoord;\n\nvoid main(){\n    gl_FragColor = u_tint * texture2D(u_diffuse, v_texCoord);\n}";
+        };
+        return BasicShader;
+    }(B2DGAME.Shader));
+    B2DGAME.BasicShader = BasicShader;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var Color = /** @class */ (function () {
+        function Color(r, g, b, a) {
+            if (r === void 0) { r = 255; }
+            if (g === void 0) { g = 255; }
+            if (b === void 0) { b = 255; }
+            if (a === void 0) { a = 255; }
+            this._r = r;
+            this._g = g;
+            this._b = b;
+            this._a = a;
+        }
+        Object.defineProperty(Color.prototype, "r", {
+            get: function () {
+                return this._r;
+            },
+            set: function (value) {
+                this._r = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "rFloat", {
+            get: function () {
+                return this._r / 255;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "g", {
+            get: function () {
+                return this._g;
+            },
+            set: function (value) {
+                this._g = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "gFloat", {
+            get: function () {
+                return this._g / 255;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "b", {
+            get: function () {
+                return this._b;
+            },
+            set: function (value) {
+                this._b = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "bFloat", {
+            get: function () {
+                return this._b / 255;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "a", {
+            get: function () {
+                return this._a;
+            },
+            set: function (value) {
+                this._a = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "aFloat", {
+            get: function () {
+                return this._a / 255;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Color.prototype.toArray = function () {
+            return [this._r, this._g, this._b, this._a];
+        };
+        Color.prototype.toFloatArray = function () {
+            return [this._r / 255.0, this._g / 255.0, this._b / 255.0, this._a / 255.0];
+        };
+        Color.prototype.toFloat32Array = function () {
+            return new Float32Array(this.toFloatArray());
+        };
+        Color.white = function () {
+            return new Color(255, 255, 255, 255);
+        };
+        Color.black = function () {
+            return new Color(0, 0, 0, 255);
+        };
+        Color.red = function () {
+            return new Color(255, 0, 0, 255);
+        };
+        Color.green = function () {
+            return new Color(0, 255, 0, 255);
+        };
+        Color.blue = function () {
+            return new Color(0, 0, 255, 255);
+        };
+        return Color;
+    }());
+    B2DGAME.Color = Color;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var Material = /** @class */ (function () {
+        function Material(name, diffuseTextureName, tint) {
+            this._name = name;
+            this._diffuseTextureName = diffuseTextureName;
+            this._tint = tint;
+            if (this._diffuseTextureName !== undefined) {
+                this._diffuseTexture = B2DGAME.TextureManager.getTexture(this._diffuseTextureName);
+            }
+        }
+        Object.defineProperty(Material.prototype, "name", {
+            get: function () {
+                return this._name;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Material.prototype, "diffuseTextureName", {
+            get: function () {
+                return this._diffuseTextureName;
+            },
+            set: function (value) {
+                if (this._diffuseTexture !== undefined) {
+                    B2DGAME.TextureManager.releaseTexture(this._diffuseTextureName);
+                }
+                this._diffuseTextureName = value;
+                if (this._diffuseTextureName !== undefined) {
+                    this._diffuseTexture = B2DGAME.TextureManager.getTexture(this._diffuseTextureName);
+                }
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Material.prototype, "diffuseTexture", {
+            get: function () {
+                return this._diffuseTexture;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Material.prototype, "tint", {
+            get: function () {
+                return this._tint;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Material.prototype.destroy = function () {
+            B2DGAME.TextureManager.releaseTexture(this._diffuseTextureName);
+            this._diffuseTexture = undefined;
+        };
+        return Material;
+    }());
+    B2DGAME.Material = Material;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var MaterialReferenceNode = /** @class */ (function () {
+        function MaterialReferenceNode(material) {
+            this.referenceCount = 1;
+            this.material = material;
+        }
+        return MaterialReferenceNode;
+    }());
+    var MaterialManager = /** @class */ (function () {
+        function MaterialManager() {
+        }
+        MaterialManager.registerMaterial = function (material) {
+            if (MaterialManager._materials[material.name] === undefined) {
+                MaterialManager._materials[material.name] = new MaterialReferenceNode(material);
+            }
+        };
+        MaterialManager.getMaterial = function (materialName) {
+            if (MaterialManager._materials[materialName] === undefined) {
+                return undefined;
+            }
+            else {
+                MaterialManager._materials[materialName].referenceCount++;
+                return MaterialManager._materials[materialName].material;
+            }
+        };
+        MaterialManager.releaseMaterial = function (materialName) {
+            if (MaterialManager._materials[materialName] === undefined) {
+                console.log("Cannot release a material that has not been registered");
+            }
+            else {
+                MaterialManager._materials[materialName].referenceCount--;
+                if (MaterialManager._materials[materialName].referenceCount < 1) {
+                    MaterialManager._materials[materialName].material.destroy();
+                    MaterialManager._materials[materialName].material = undefined;
+                    delete MaterialManager._materials[materialName];
+                }
+            }
+        };
+        MaterialManager._materials = {};
+        return MaterialManager;
+    }());
+    B2DGAME.MaterialManager = MaterialManager;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
     /**
     * Represents a 2- Dimensional sprite which is drawn on the screen
     */
@@ -469,11 +702,11 @@ var B2DGAME;
         /**
          *  Creates a new sprite
          * @param name The name of this sprite
-         * @param textureName The name of the texture to be used.
+         * @param materialName The name of the material to be used.
          * @param width The width of this sprite
          * @param height The height of this sprite
          */
-        function Sprite(name, textureName, width, height) {
+        function Sprite(name, materialName, width, height) {
             if (width === void 0) { width = 200; }
             if (height === void 0) { height = 200; }
             /**
@@ -483,8 +716,8 @@ var B2DGAME;
             this._name = name;
             this._width = width;
             this._height = height;
-            this._textureName = textureName;
-            this._texture = B2DGAME.TextureManager.getTexture(this._textureName);
+            this._materialName = materialName;
+            this._material = B2DGAME.MaterialManager.getMaterial(this._materialName);
         }
         Object.defineProperty(Sprite.prototype, "name", {
             get: function () {
@@ -495,7 +728,9 @@ var B2DGAME;
         });
         Sprite.prototype.destroy = function () {
             this._buffer.destroy();
-            B2DGAME.TextureManager.releaseTexture(this._textureName);
+            B2DGAME.MaterialManager.releaseMaterial(this._materialName);
+            this._material = undefined;
+            this._materialName = undefined;
         };
         /**
         * Performs loading routines on this sprite
@@ -528,9 +763,15 @@ var B2DGAME;
         Sprite.prototype.update = function (time) {
         };
         Sprite.prototype.draw = function (shader) {
-            this._texture.activateAndBind(0);
-            var diffuseLocation = shader.getUniformLocation("u_diffuse");
-            B2DGAME.gl.uniform1i(diffuseLocation, 0);
+            var modelLocation = shader.getUniformLocation("u_model");
+            B2DGAME.gl.uniformMatrix4fv(modelLocation, false, new Float32Array(B2DGAME.Matrix4x4.translation(this.position).data));
+            var colorLocation = shader.getUniformLocation("u_tint");
+            B2DGAME.gl.uniform4fv(colorLocation, this._material.tint.toFloat32Array());
+            if (this._material.diffuseTexture !== undefined) {
+                this._material.diffuseTexture.activateAndBind(0);
+                var diffuseLocation = shader.getUniformLocation("u_diffuse");
+                B2DGAME.gl.uniform1i(diffuseLocation, 0);
+            }
             this._buffer.bind();
             this._buffer.draw();
         };
@@ -718,9 +959,184 @@ var B2DGAME;
             m._data[14] = position.z;
             return m;
         };
+        /**
+         * Creates a rotation matrix on the X axis from the provided angle in radians.
+         * @param angleInRadians The angle in radians.
+         */
+        Matrix4x4.rotationX = function (angleInRadians) {
+            var m = new Matrix4x4();
+            var c = Math.cos(angleInRadians);
+            var s = Math.sin(angleInRadians);
+            m._data[5] = c;
+            m._data[6] = s;
+            m._data[9] = -s;
+            m._data[10] = c;
+            return m;
+        };
+        /**
+         * Creates a rotation matrix on the Y axis from the provided angle in radians.
+         * @param angleInRadians The angle in radians.
+         */
+        Matrix4x4.rotationY = function (angleInRadians) {
+            var m = new Matrix4x4();
+            var c = Math.cos(angleInRadians);
+            var s = Math.sin(angleInRadians);
+            m._data[0] = c;
+            m._data[2] = -s;
+            m._data[8] = s;
+            m._data[10] = c;
+            return m;
+        };
+        /**
+         * Creates a rotation matrix on the Z axis from the provided angle in radians.
+         * @param angleInRadians The angle in radians.
+         */
+        Matrix4x4.rotationZ = function (angleInRadians) {
+            var m = new Matrix4x4();
+            var c = Math.cos(angleInRadians);
+            var s = Math.sin(angleInRadians);
+            m._data[0] = c;
+            m._data[1] = s;
+            m._data[4] = -s;
+            m._data[5] = c;
+            return m;
+        };
+        /**
+         * Creates a rotation matrix from the provided angles in radians.
+         * @param xRadians The angle in radians on the X axis.
+         * @param yRadians The angle in radians on the Y axis.
+         * @param zRadians The angle in radians on the Z axis.
+         */
+        Matrix4x4.rotationXYZ = function (xRadians, yRadians, zRadians) {
+            var rx = Matrix4x4.rotationX(xRadians);
+            var ry = Matrix4x4.rotationY(yRadians);
+            var rz = Matrix4x4.rotationZ(zRadians);
+            // ZYX
+            return Matrix4x4.multiply(Matrix4x4.multiply(rz, ry), rx);
+        };
+        /**
+         * Creates a scale matrix.
+         * @param scale The scale to use.
+         */
+        Matrix4x4.scale = function (scale) {
+            var m = new Matrix4x4();
+            m._data[0] = scale.x;
+            m._data[5] = scale.y;
+            m._data[10] = scale.z;
+            return m;
+        };
+        /**
+         * Multiplies matrix a by matrix b and returns the result.
+         * @param a The first matrix.
+         * @param b The second matrix.
+         */
+        Matrix4x4.multiply = function (a, b) {
+            var m = new Matrix4x4();
+            var b00 = b._data[0 * 4 + 0];
+            var b01 = b._data[0 * 4 + 1];
+            var b02 = b._data[0 * 4 + 2];
+            var b03 = b._data[0 * 4 + 3];
+            var b10 = b._data[1 * 4 + 0];
+            var b11 = b._data[1 * 4 + 1];
+            var b12 = b._data[1 * 4 + 2];
+            var b13 = b._data[1 * 4 + 3];
+            var b20 = b._data[2 * 4 + 0];
+            var b21 = b._data[2 * 4 + 1];
+            var b22 = b._data[2 * 4 + 2];
+            var b23 = b._data[2 * 4 + 3];
+            var b30 = b._data[3 * 4 + 0];
+            var b31 = b._data[3 * 4 + 1];
+            var b32 = b._data[3 * 4 + 2];
+            var b33 = b._data[3 * 4 + 3];
+            var a00 = a._data[0 * 4 + 0];
+            var a01 = a._data[0 * 4 + 1];
+            var a02 = a._data[0 * 4 + 2];
+            var a03 = a._data[0 * 4 + 3];
+            var a10 = a._data[1 * 4 + 0];
+            var a11 = a._data[1 * 4 + 1];
+            var a12 = a._data[1 * 4 + 2];
+            var a13 = a._data[1 * 4 + 3];
+            var a20 = a._data[2 * 4 + 0];
+            var a21 = a._data[2 * 4 + 1];
+            var a22 = a._data[2 * 4 + 2];
+            var a23 = a._data[2 * 4 + 3];
+            var a30 = a._data[3 * 4 + 0];
+            var a31 = a._data[3 * 4 + 1];
+            var a32 = a._data[3 * 4 + 2];
+            var a33 = a._data[3 * 4 + 3];
+            m._data[0] = b00 * a00 + b01 * a10 + b02 * a20 + b03 * a30;
+            m._data[1] = b00 * a01 + b01 * a11 + b02 * a21 + b03 * a31;
+            m._data[2] = b00 * a02 + b01 * a12 + b02 * a22 + b03 * a32;
+            m._data[3] = b00 * a03 + b01 * a13 + b02 * a23 + b03 * a33;
+            m._data[4] = b10 * a00 + b11 * a10 + b12 * a20 + b13 * a30;
+            m._data[5] = b10 * a01 + b11 * a11 + b12 * a21 + b13 * a31;
+            m._data[6] = b10 * a02 + b11 * a12 + b12 * a22 + b13 * a32;
+            m._data[7] = b10 * a03 + b11 * a13 + b12 * a23 + b13 * a33;
+            m._data[8] = b20 * a00 + b21 * a10 + b22 * a20 + b23 * a30;
+            m._data[9] = b20 * a01 + b21 * a11 + b22 * a21 + b23 * a31;
+            m._data[10] = b20 * a02 + b21 * a12 + b22 * a22 + b23 * a32;
+            m._data[11] = b20 * a03 + b21 * a13 + b22 * a23 + b23 * a33;
+            m._data[12] = b30 * a00 + b31 * a10 + b32 * a20 + b33 * a30;
+            m._data[13] = b30 * a01 + b31 * a11 + b32 * a21 + b33 * a31;
+            m._data[14] = b30 * a02 + b31 * a12 + b32 * a22 + b33 * a32;
+            m._data[15] = b30 * a03 + b31 * a13 + b32 * a23 + b33 * a33;
+            return m;
+        };
+        Matrix4x4.prototype.toFloat32Array = function () {
+            return new Float32Array(this._data);
+        };
         return Matrix4x4;
     }());
     B2DGAME.Matrix4x4 = Matrix4x4;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var Transform = /** @class */ (function () {
+        function Transform() {
+            /** The position. Default: Vector3.zero */
+            this.position = B2DGAME.Vector3.zero;
+            /** The rotation. Default: Vector3.zero */
+            this.rotation = B2DGAME.Vector3.zero;
+            /** The rotation. Default: Vector3.one */
+            this.scale = B2DGAME.Vector3.one;
+        }
+        /**
+         * Creates a copy of the provided transform.
+         * @param transform The transform to be copied.
+         */
+        Transform.prototype.copyFrom = function (transform) {
+            this.position.copyFrom(transform.position);
+            this.rotation.copyFrom(transform.rotation);
+            this.scale.copyFrom(transform.scale);
+        };
+        /** Creates and returns a matrix based on this transform. */
+        Transform.prototype.getTransformationMatrix = function () {
+            var translation = B2DGAME.Matrix4x4.translation(this.position);
+            var rotation = B2DGAME.Matrix4x4.rotationXYZ(this.rotation.x, this.rotation.y, this.rotation.z);
+            var scale = B2DGAME.Matrix4x4.scale(this.scale);
+            // T * R * S
+            return B2DGAME.Matrix4x4.multiply(B2DGAME.Matrix4x4.multiply(translation, rotation), scale);
+        };
+        /**
+         * Sets the values of this transform to the ones provided in the given JSON.
+         * Only values which are overridden need be provided. For example, a position of [0,1,0]
+         * needs only to provide the y value (1) as 0 is the default for x and z.
+         * @param json The JSON to set from.
+         */
+        Transform.prototype.setFromJson = function (json) {
+            if (json.position !== undefined) {
+                this.position.setFromJson(json.position);
+            }
+            if (json.rotation !== undefined) {
+                this.rotation.setFromJson(json.rotation);
+            }
+            if (json.scale !== undefined) {
+                this.scale.setFromJson(json.scale);
+            }
+        };
+        return Transform;
+    }());
+    B2DGAME.Transform = Transform;
 })(B2DGAME || (B2DGAME = {}));
 var B2DGAME;
 (function (B2DGAME) {
@@ -819,11 +1235,141 @@ var B2DGAME;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Vector3, "zero", {
+            /** Returns a vector3 with all components set to 0. */
+            get: function () {
+                return new Vector3();
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Vector3, "one", {
+            /** Returns a vector3 with all components set to 1. */
+            get: function () {
+                return new Vector3(1, 1, 1);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        /**
+         * Calculates the difference between vector a and vector b.
+         * @param a The first vector.
+         * @param b The second vector.
+         */
+        Vector3.distance = function (a, b) {
+            var diff = a.subtract(b);
+            return Math.sqrt(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+        };
+        /**
+         * Sets the x, y and z components of this vector.
+         * @param x The x component value.
+         * @param y The y component value.
+         * @param z The z component value.
+         */
+        Vector3.prototype.set = function (x, y, z) {
+            if (x !== undefined) {
+                this._x = x;
+            }
+            if (y !== undefined) {
+                this._y = y;
+            }
+            if (z !== undefined) {
+                this._z = z;
+            }
+        };
+        /**
+         * Copies the contents of the provided vector to this vector.
+         * @param vector The vector to be copied.
+         */
+        Vector3.prototype.copyFrom = function (vector) {
+            this._x = vector._x;
+            this._y = vector._y;
+            this._z = vector._z;
+        };
+        /**
+         * Check if this vector is equal to the one passed in.
+         * @param v The vector to check against.
+         */
+        Vector3.prototype.equals = function (v) {
+            return (this.x === v.x && this.y === v.y && this.z === v.z);
+        };
+        /**
+         * Sets the values of this vector from the provided JSON.
+         * @param json The JSON to set from.
+         */
+        Vector3.prototype.setFromJson = function (json) {
+            if (json.x !== undefined) {
+                this._x = Number(json.x);
+            }
+            if (json.y !== undefined) {
+                this._y = Number(json.y);
+            }
+            if (json.z !== undefined) {
+                this._z = Number(json.z);
+            }
+        };
         Vector3.prototype.toArray = function () {
             return [this._x, this._y, this._z];
         };
         Vector3.prototype.toFloat32Array = function () {
             return new Float32Array(this.toArray());
+        };
+        /** Converts this vector to a Vector2 by dropping the Z component. */
+        Vector3.prototype.toVector2 = function () {
+            return new B2DGAME.Vector2(this._x, this._y);
+        };
+        /**
+        * Adds the provided vector to this vector.
+        * @param v The vector to be added.
+        */
+        Vector3.prototype.add = function (v) {
+            this._x += v._x;
+            this._y += v._y;
+            this._z += v._z;
+            return this;
+        };
+        /**
+         * Subtracts the provided vector from this vector.
+         * @param v The vector to be subtracted.
+         */
+        Vector3.prototype.subtract = function (v) {
+            this._x -= v._x;
+            this._y -= v._y;
+            this._z -= v._z;
+            return this;
+        };
+        /**
+         * Multiplies this vector by the provided vector.
+         * @param v The vector to be multiplied by.
+         */
+        Vector3.prototype.multiply = function (v) {
+            this._x *= v._x;
+            this._y *= v._y;
+            this._z *= v._z;
+            return this;
+        };
+        /**
+         * Divides this vector by the provided vector.
+         * @param v The vector to be divided by.
+         */
+        Vector3.prototype.divide = function (v) {
+            this._x /= v._x;
+            this._y /= v._y;
+            this._z /= v._z;
+            return this;
+        };
+        /**
+         * Scales this vector by the provided number.
+         */
+        Vector3.prototype.scale = function (scale) {
+            this._x *= scale;
+            this._y *= scale;
+            this._z *= scale;
+            return this;
+        };
+        /** Clones this vector. */
+        Vector3.prototype.clone = function () {
+            return new Vector3(this._x, this._y, this._z);
         };
         return Vector3;
     }());
@@ -929,5 +1475,14 @@ var B2DGAME;
         return MessageSubscriptionNode;
     }());
     B2DGAME.MessageSubscriptionNode = MessageSubscriptionNode;
+})(B2DGAME || (B2DGAME = {}));
+var B2DGAME;
+(function (B2DGAME) {
+    var SimObjects = /** @class */ (function () {
+        function SimObjects() {
+        }
+        return SimObjects;
+    }());
+    B2DGAME.SimObjects = SimObjects;
 })(B2DGAME || (B2DGAME = {}));
 //# sourceMappingURL=main.js.map
